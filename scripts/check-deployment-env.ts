@@ -1,12 +1,14 @@
 #!/usr/bin/env bun
 
+export {};
+
 /**
  * Validate the production boot contract without starting Next.js or contacting
  * external services. Values are never printed: this command is safe to use in
  * CI logs and hosting terminals.
  */
-process.env.NODE_ENV = "production";
-delete process.env.NEXT_PHASE;
+Reflect.set(process.env, "NODE_ENV", "production");
+Reflect.deleteProperty(process.env, "NEXT_PHASE");
 
 const { EnvValidationError, validateAppEnv } = await import("@/lib/env");
 
