@@ -1,5 +1,5 @@
 /**
- * Reconcile Stripe against this database. `pnpm reconcile:stripe`
+ * Reconcile Stripe against this database. `bun run reconcile:stripe`
  *
  * Answers one question: does what Stripe thinks happened match what we recorded?
  * Every billing guarantee in this kit is enforced by an index, a transaction, or
@@ -13,10 +13,10 @@
  * — which is the exact failure mode this script exists to detect.
  *
  * Usage:
- *   pnpm reconcile:stripe                 # last 7 days, Stripe included if keyed
- *   pnpm reconcile:stripe --days 30
- *   pnpm reconcile:stripe --local-only    # no Stripe API call
- *   pnpm reconcile:stripe --json          # machine-readable, for a pipeline
+ *   bun run reconcile:stripe                 # last 7 days, Stripe included if keyed
+ *   bun run reconcile:stripe --days 30
+ *   bun run reconcile:stripe --local-only    # no Stripe API call
+ *   bun run reconcile:stripe --json          # machine-readable, for a pipeline
  *
  * Exits 1 when anything at `error` severity is found, so it can gate a release.
  * Warnings — a parked event a human is already looking at — exit 0 deliberately:
@@ -48,7 +48,7 @@ if (!Number.isFinite(days) || days <= 0) {
 
 if (!process.env.DATABASE_URL?.trim()) {
   console.error(
-    "DATABASE_URL is required.\n\n  DATABASE_URL=postgres://... pnpm reconcile:stripe\n"
+    "DATABASE_URL is required.\n\n  DATABASE_URL=postgres://... bun run reconcile:stripe\n"
   );
   process.exit(1);
 }

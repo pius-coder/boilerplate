@@ -30,11 +30,18 @@ const redactPaths = [
   "*.privateKey*",
   // Known envs
   "DATABASE_URL",
+  "POSTGRES_URL",
+  "REDIS_URL",
+  "RATE_LIMIT_REDIS_URL",
   "BETTER_AUTH_SECRET",
   "STORAGE_SECRET_KEY",
   "STORAGE_ACCESS_KEY",
   "S3_SECRET_ACCESS_KEY",
   "S3_ACCESS_KEY_ID",
+  "S3_ACCESS_KEY",
+  "S3_SECRET_KEY",
+  "AWS_ACCESS_KEY_ID",
+  "AWS_SECRET_ACCESS_KEY",
 ];
 
 export function createLogger(options?: LoggerOptions): Logger {

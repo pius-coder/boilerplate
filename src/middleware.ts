@@ -2,12 +2,18 @@ import createMiddleware from "next-intl/middleware";
 import { NextRequest, NextResponse } from "next/server";
 
 import {
+  COUNTRY_HEADER,
+  resolveCountryDetectionHeader,
+} from "@/config/country-context";
+import {
   ORGANIZATION_CONTEXT_MODE_HEADER,
   ORGANIZATION_HEADER,
   ORGANIZATION_QUERY_PARAM,
   normalizeOrganizationSlug,
 } from "@/config/organization-context";
+import { DEFAULT_REGION_CODE, REGION_PROFILES } from "@/config/regions";
 import { routing } from "@/i18n/routing";
+import { applyCountryContext, type CountryResolution } from "@/lib/country-context";
 import { normalizeRequestId } from "@/lib/logger/request-id";
 
 /**
@@ -20,7 +26,7 @@ function requestHeadersWithContext(
   request: NextRequest,
   requestId: string,
   isApi: boolean
-): Headers {
+): { headers: Headers; country: CountryResolution } {
   const headers = new Headers(request.headers);
   headers.set("x-request-id", requestId);
   headers.set(ORGANIZATION_CONTEXT_MODE_HEADER, isApi ? "api" : "page");
@@ -41,7 +47,24 @@ function requestHeadersWithContext(
     headers.delete(ORGANIZATION_HEADER);
   }
 
-  return headers;
+  // Country resolution is a display/payment default, never proof of residence
+  // or an authorization input. The proxy header is read directly from the
+  // environment rather than through getAppEnv(): middleware must not depend on
+  // production secrets such as Stripe keys, and detection is off by default.
+  const geoHeaderName = resolveCountryDetectionHeader(
+    process.env.COUNTRY_DETECTION_HEADER
+  );
+  const country = applyCountryContext(headers, {
+    cookieHeader: request.headers.get("cookie"),
+    geoHeaderName,
+    geoHeaderValue: geoHeaderName
+      ? request.headers.get(geoHeaderName)
+      : null,
+    supportedCodes: Object.keys(REGION_PROFILES),
+    defaultCode: DEFAULT_REGION_CODE,
+  });
+
+  return { headers, country };
 }
 
 /**
@@ -71,18 +94,22 @@ function forwardRequestHeaders(
 export default function middleware(request: NextRequest) {
   const requestId = normalizeRequestId(request.headers.get("x-request-id"));
   const isApi = request.nextUrl.pathname.startsWith("/api");
-  const requestHeaders = requestHeadersWithContext(request, requestId, isApi);
+  const requestContext = requestHeadersWithContext(request, requestId, isApi);
 
   // API routes never participate in locale negotiation.
   if (isApi) {
-    const response = NextResponse.next({ request: { headers: requestHeaders } });
+    const response = NextResponse.next({
+      request: { headers: requestContext.headers },
+    });
     response.headers.set("x-request-id", requestId);
+    response.headers.set(COUNTRY_HEADER, requestContext.country.code);
     return response;
   }
 
   const response = intlMiddleware(request);
-  forwardRequestHeaders(response, requestHeaders);
+  forwardRequestHeaders(response, requestContext.headers);
   response.headers.set("x-request-id", requestId);
+  response.headers.set(COUNTRY_HEADER, requestContext.country.code);
   return response;
 }
 

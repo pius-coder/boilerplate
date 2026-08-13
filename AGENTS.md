@@ -155,8 +155,8 @@ tests and visual hierarchy still requires browser review.
  - Env:
   - `TEXT2VIDEO_MOCK_URL` — dev fallback video URL.
 - Migrations: after changing `src/db/schema.ts`, always run:
-  - `pnpm db:generate` (writes `src/db/migrations/NNNN_*.sql` — commit it with `meta/_journal.json`)
-  - `pnpm db:migrate` (applies locally)
+  - `bun run db:generate` (writes `src/db/migrations/NNNN_*.sql` — commit it with `meta/_journal.json`)
+  - `bun run db:migrate` (applies locally)
   - Migrations must be expand/contract safe: the currently deployed code has to keep working against the new schema, because code and schema ship separately. See `DEPLOYMENT.md`.
 
 Notes:
@@ -164,14 +164,23 @@ Notes:
 - Consider async task processing and refunds-on-failure for production.
 
 ## Build, Test, and Development Commands
-- `pnpm install && pnpm setup`: First-clone bootstrap — writes `.env` with generated secrets, starts local Postgres via `docker-compose.yml`, applies migrations to the dev and test databases. Idempotent; never overwrites an existing `.env`.
-- `pnpm db:generate` / `pnpm db:migrate` / `pnpm db:studio`: Drizzle workflow against the local database.
-- `pnpm db:check:prod` / `pnpm db:migrate:prod`: Deployed-database migration runner (advisory-locked, non-interactive). Migrations are **never** automatic on deploy — see `DEPLOYMENT.md`.
-- `pnpm dev` / `pnpm dev:webpack`: Start the application dev server (Turbopack or Webpack).
-- `pnpm build` then `pnpm start`: Production build and runtime smoke test; both must succeed before opening a PR.
-- `pnpm lint`: Execute `next lint`; warnings are treated as blockers.
-- `pnpm test:fast` / `pnpm test:run` / `pnpm test:cov` / `pnpm test:db`: Vitest tiers; see `tests/README.md`. `test:fast` runs only the hermetic mocked and component projects; `test:db` additionally needs `TEST_DATABASE_URL` and a one-time `pnpm test:db:setup`.
-- `pnpm drizzle-kit <generate|migrate> --config src/db/config.ts`: Keep database migrations synchronized with `src/db/schema.ts`.
+
+### Package-manager policy
+
+Bun `1.3.14` is the only package manager. The authoritative files are
+`package.json`, `.bun-version`, and `bun.lock`. Use `bun install`, `bun add`,
+`bun remove`, `bun x`, and `bun run`; never invoke npm, pnpm, Yarn, or Corepack,
+and never create their lockfiles. Corepack does not manage Bun. CI must install
+dependencies with `bun ci` so a stale lockfile fails instead of being rewritten.
+
+- `bun install && bun run setup`: First-clone bootstrap — writes `.env` with generated secrets, starts local Postgres via `docker-compose.yml`, applies migrations to the dev and test databases. Idempotent; never overwrites an existing `.env`.
+- `bun run db:generate` / `bun run db:migrate` / `bun run db:studio`: Drizzle workflow against the local database.
+- `bun run db:check:prod` / `bun run db:migrate:prod`: Deployed-database migration runner (advisory-locked, non-interactive). Migrations are **never** automatic on deploy — see `DEPLOYMENT.md`.
+- `bun run dev` / `bun run dev:webpack`: Start the application dev server (Turbopack or Webpack).
+- `bun run build` then `bun run start`: Production build and runtime smoke test; both must succeed before opening a PR.
+- `bun run lint`: Execute `next lint`; warnings are treated as blockers.
+- `bun run test:fast` / `bun run test:run` / `bun run test:cov` / `bun run test:db`: Vitest tiers; see `tests/README.md`. `test:fast` runs only the hermetic mocked and component projects; `test:db` additionally needs `TEST_DATABASE_URL` and a one-time `bun run test:db:setup`.
+- `bun x drizzle-kit <generate|migrate> --config src/db/config.ts`: Keep database migrations synchronized with `src/db/schema.ts`.
  - The `files` table powers uploads; regenerate and migrate when touching storage schema.
   - The `tasks` table powers usage tracking; regenerate and migrate when touching task schema.
 
@@ -182,7 +191,7 @@ Notes:
 - TypeScript-first; prefer named exports and React Server Components unless client-only APIs force `"use client"`.
 - Compose UI with functional components, Tailwind utilities, and co-locate reusable pieces under `src/components`. Check `src/components/ui/` for an existing primitive first — see "The frontend rules" above.
 - Files stay kebab-case (`auth-screen.tsx`); colocate feature helpers and avoid deep relative imports—use `@/` alias instead.
-- Run `pnpm lint` before pushing; enable ESLint and Tailwind IntelliSense in your editor for consistent output.
+- Run `bun run lint` before pushing; enable ESLint and Tailwind IntelliSense in your editor for consistent output.
  - Storage adapters: do not hardcode provider specifics in routes; extend `StorageAdapter` and select via `getStorageAdapter()`.
 
 ## Testing Guidelines
@@ -190,11 +199,11 @@ Notes:
 
 - Vitest, five tiers, each defined by what it may mock: `tests/unit` (mocks nothing), `tests/api` (mocks services/models, never `@/lib/*` guards), `tests/services` (mocks models), `tests/components` (browser-visible behavior), and `tests/db` (mocks nothing, needs real infrastructure).
 - Tests live under `tests/`, mirroring the source tree — not colocated beside the feature.
-- `pnpm test:fast` for the hermetic pre-commit pass, `pnpm test:run` for every configured project, `pnpm test:cov` to enforce coverage thresholds, and `pnpm test:db` for the database tier.
+- `bun run test:fast` for the hermetic pre-commit pass, `bun run test:run` for every configured project, `bun run test:cov` to enforce coverage thresholds, and `bun run test:db` for the database tier.
 - The database tier is opt-in via `TEST_DATABASE_URL` and skips without it. It truncates tables, so the database name must contain `"test"`; both the harness and `scripts/setup-test-db.mjs` refuse otherwise. CI runs it against a Postgres 16 service container.
 - Two non-negotiables: every route gets an auth-gate test asserting the data function was **not** called before the 401/403, and every credit or money mutation gets a replay test proving one effect from two identical calls.
 - Coverage thresholds in `vitest.config.mts` are a ratchet scoped to `src/services`, `src/models`, `src/lib`, `src/app/api`, and `apps/admin/lib`. Raise them when a run beats them; never lower one to turn a build green.
-- Gates: pre-commit runs `pnpm lint && pnpm test:fast`; `prebuild` runs every configured project with `pnpm test:run`; CI runs lint → migrate test DB → `pnpm test:cov` → build.
+- Gates: pre-commit runs `bun run lint && bun run test:fast`; `prebuild` runs every configured project with `bun run test:run`; CI runs lint → migrate test DB → `bun run test:cov` → build.
 - For auth or i18n work, verify at least one happy-path call (e.g., `/api/health` or a localized landing page) and document the manual check in the PR.
  - For storage, verify the minimal flow end‑to‑end:
    1) `POST /api/storage/uploads` returns a presigned URL
@@ -206,7 +215,7 @@ Notes:
 ## Commit & Pull Request Guidelines
 - Follow Conventional Commits (`feat:`, `fix:`, `chore:`) as reflected in recent history.
 - Keep commits focused; call out migrations, new env vars, or breaking config changes in the body.
-- PRs must include a summary, validation notes (`pnpm lint`, `pnpm build`, migrations), linked issues, and UI screenshots when applicable.
+- PRs must include a summary, validation notes (`bun run lint`, `bun run build`, migrations), linked issues, and UI screenshots when applicable.
 - Request owner review for changes touching `src/app/api` or `src/db` because they affect deployments and authentication.
  - Changes to storage adapters (`src/services/storage/*`) or `files` schema must call out required env vars, CORS rules, and any backward‑compat constraints (e.g., key format).
 

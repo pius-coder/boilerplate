@@ -4,9 +4,9 @@ The admin console is a separate Next.js app so public web routes and admin-only 
 
 ## Commands
 
-- `pnpm dev:admin` runs the admin app on port `3001`.
-- `pnpm build:admin` builds only the admin app.
-- `pnpm start:admin` starts the built admin app on port `3001`.
+- `bun run dev:admin` runs the admin app on port `3001`.
+- `bun run build:admin` builds only the admin app.
+- `bun run start:admin` starts the built admin app on port `3001`.
 
 ## Environment
 
@@ -155,7 +155,7 @@ opposite defect. Order numbers come in three shapes and the page labels them:
 redelivery collides instead of billing twice), UUIDv7, and old numeric ids.
 
 `/reconciliation` runs the **local** half of `reconcileLocalBilling()` — the same
-findings `pnpm reconcile:stripe --local-only` computes, for people who do not run
+findings `bun run reconcile:stripe --local-only` computes, for people who do not run
 CLI commands. It cannot detect "Stripe charged them and we were never told";
 that needs the invoice API and stays in the script, and the page says so rather
 than implying a green result is the whole check.
@@ -243,7 +243,7 @@ Shared auth, database schema, product models, and service integrations stay in `
 - Use a dedicated admin origin, for example `https://admin.example.com`.
 - Set `NEXT_PUBLIC_ADMIN_WEB_URL` to that origin.
 - Keep `DATABASE_URL`, `BETTER_AUTH_SECRET`, and other shared secrets aligned with the public web app.
-- Promote trusted operators with `pnpm admin:promote <email> [admin_ro|admin_rw]`, then have each admin enable two-factor auth before opening the console.
+- Promote trusted operators with `bun run admin:promote <email> [admin_ro|admin_rw]`, then have each admin enable two-factor auth before opening the console.
 - Keep new admin write actions behind `requireAdminWrite()` and same-origin protection, and record them with `writeAdminAuditLog()`.
 - Set `ADMIN_MAX_CREDIT_GRANT` to a sane ceiling for your product (defaults to 100000).
 - `apps/admin/middleware.ts` sends `noindex` and `no-store` on every admin response; keep the RBAC gate in the layout and route handlers rather than moving it into middleware.

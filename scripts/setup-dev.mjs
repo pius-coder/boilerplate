@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * One-command local bootstrap: `pnpm setup`
+ * One-command local bootstrap: `bun run setup`
  *
  *   1. writes .env from .env.example, with real secrets generated
  *   2. starts the Postgres and Redis containers
@@ -127,10 +127,10 @@ if (portInUse(5432) && !postgresComposeRunning) {
 
   Finally:
 
-    pnpm db:migrate && pnpm test:db:setup
+    bun run db:migrate && bun run test:db:setup
 
   To use this repo's container instead, stop the other Postgres first and
-  re-run \x1b[1mpnpm setup\x1b[0m.
+  re-run \x1b[1mbun run setup\x1b[0m.
 `);
   process.exit(0);
 }
@@ -207,15 +207,15 @@ ok("Redis is available on localhost:6379");
 
 step("Migrations");
 
-const migrateArgs = ["exec", "drizzle-kit", "migrate", "--config", "src/db/config.ts"];
+const migrateArgs = ["run", "db:migrate"];
 
-if (run("pnpm", migrateArgs, { DATABASE_URL: DEV_DATABASE_URL }).status !== 0) {
+if (run("bun", migrateArgs, { DATABASE_URL: DEV_DATABASE_URL }).status !== 0) {
   console.error("  migration failed against sushi_dev");
   process.exit(1);
 }
 ok("sushi_dev migrated");
 
-if (run("pnpm", migrateArgs, { DATABASE_URL: TEST_DATABASE_URL }).status !== 0) {
+if (run("bun", migrateArgs, { DATABASE_URL: TEST_DATABASE_URL }).status !== 0) {
   console.error("  migration failed against sushi_test");
   process.exit(1);
 }
@@ -224,11 +224,11 @@ ok("sushi_test migrated");
 console.log(`
 \x1b[1mReady.\x1b[0m
 
-  pnpm dev        → http://localhost:3000
-  pnpm dev:admin  → http://localhost:3001
-  pnpm test:db    → database tier now runs instead of skipping
+  bun run dev        → http://localhost:3000
+  bun run dev:admin  → http://localhost:3001
+  bun run test:db    → database tier now runs instead of skipping
 
 To promote yourself to admin after signing up:
 
-  pnpm admin:promote you@example.com
+  bun run admin:promote you@example.com
 `);

@@ -126,6 +126,18 @@ describe("security headers", () => {
       expect(directive(csp, "script-src")).toContain("https://challenges.cloudflare.com");
       expect(directive(csp, "frame-src")).toContain("https://challenges.cloudflare.com");
     });
+
+    it("allows only the configured Sentry DSN origin for event ingestion", () => {
+      const csp = buildContentSecurityPolicy({
+        ...PROD,
+        sentryDsn: "https://public@errors.example.com/7",
+      });
+
+      expect(directive(csp, "connect-src")).toContain(
+        "https://errors.example.com",
+      );
+      expect(csp).not.toContain("public@");
+    });
   });
 
   describe("extension", () => {

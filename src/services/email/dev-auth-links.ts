@@ -48,7 +48,7 @@ export function logDevAuthEmailLink(input: {
   // transport, so the message is read inside a JSON string — a multi-line block
   // arrives as literal `\n` escapes, which is harder to read than the thing it
   // was trying to improve. The URL is also its own `url` field, so
-  // `pnpm dev | grep dev_link` gets it without the surrounding noise.
+  // `bun run dev | grep dev_link` gets it without the surrounding noise.
   logger.info(
     {
       event: "auth.email.dev_link",

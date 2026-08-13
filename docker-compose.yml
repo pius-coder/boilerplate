@@ -2,9 +2,9 @@
 #
 # Two databases on one server: sushi_dev for the app, sushi_test for the
 # database tests. They are separate because the test tier truncates tables on
-# every test — sharing one database would wipe your dev data on `pnpm test:db`.
+# every test — sharing one database would wipe your dev data on `bun run test:db`.
 #
-#   docker compose up -d      (or: pnpm db:up)
+#   docker compose up -d      (or: bun run db:up)
 #
 # Data lives in a named volume, so `docker compose down` keeps it and
 # `docker compose down -v` throws it away.

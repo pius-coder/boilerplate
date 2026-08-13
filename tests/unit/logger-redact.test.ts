@@ -45,6 +45,18 @@ describe("logger redaction", () => {
     expect(result).toContain("[REDACTED]");
   });
 
+  it("redacts managed Postgres and Redis URL aliases", () => {
+    expect(
+      redactLogFields({
+        POSTGRES_URL: "postgresql://app:secret@postgres.internal/app",
+        REDIS_URL: "redis://:secret@redis.internal:6379",
+      }),
+    ).toEqual({
+      POSTGRES_URL: "[REDACTED]",
+      REDIS_URL: "[REDACTED]",
+    });
+  });
+
   it("serializes errors safely and tolerates circular diagnostic objects", () => {
     const cause = new Error("provider rejected whsec_very-secret");
     Object.assign(cause, { accessToken: "provider-token" });

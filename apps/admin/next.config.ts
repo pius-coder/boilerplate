@@ -48,6 +48,7 @@ if (adminWebUrl) {
 }
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   experimental: {
     optimizePackageImports: ["sonner"],
   },

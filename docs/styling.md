@@ -107,5 +107,5 @@ These surfaces do not follow the normal preset stylesheet:
    palettes in application and admin UI.
 5. Check representative web and admin screens, including focus, disabled,
    warning, success, dialog, table, and mobile-navigation states.
-6. Run `pnpm lint`, `pnpm test:run`, `pnpm build:web`, and
-   `pnpm build:admin`.
+6. Run `bun run lint`, `bun run test:run`, `bun run build:web`, and
+   `bun run build:admin`.

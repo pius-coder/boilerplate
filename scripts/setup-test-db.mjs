@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
- * Apply migrations to the throwaway database used by `pnpm test:db`.
+ * Apply migrations to the throwaway database used by `bun run test:db`.
  *
  * Exists so the database tier has a one-command setup that works the same on a
  * laptop and in CI, and so the "must be a test database" guard is enforced
  * before drizzle-kit ever connects — not only inside the test files.
  *
- *   TEST_DATABASE_URL=postgresql://localhost:5432/sushi_test pnpm test:db:setup
+ *   TEST_DATABASE_URL=postgresql://localhost:5432/sushi_test bun run test:db:setup
  */
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
@@ -18,7 +18,7 @@ import { parse } from "dotenv";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 // Read TEST_DATABASE_URL out of the env files the way the app reads its own
-// config, so `pnpm test:db:setup` works without exporting anything by hand.
+// config, so `bun run test:db:setup` works without exporting anything by hand.
 // An explicit shell value wins.
 if (!process.env.TEST_DATABASE_URL?.trim()) {
   for (const file of [".env", ".env.local"]) {
@@ -35,7 +35,7 @@ if (!url) {
   console.error(
     "TEST_DATABASE_URL is not set.\n\n" +
       "  createdb sushi_test\n" +
-      "  TEST_DATABASE_URL=postgresql://localhost:5432/sushi_test pnpm test:db:setup\n"
+      "  TEST_DATABASE_URL=postgresql://localhost:5432/sushi_test bun run test:db:setup\n"
   );
   process.exit(1);
 }
@@ -60,8 +60,8 @@ if (!name.toLowerCase().includes("test")) {
 }
 
 const result = spawnSync(
-  "pnpm",
-  ["exec", "drizzle-kit", "migrate", "--config", "src/db/config.ts"],
+  "bun",
+  ["run", "db:migrate"],
   {
     stdio: "inherit",
     // dotenv does not override variables that are already set, so this wins

@@ -347,6 +347,36 @@ describe("layering", () => {
   });
 });
 
+describe("package manager", () => {
+  it("keeps Bun as the only repository package manager", () => {
+    const packageJson = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
+    const bunVersion = readFileSync(join(ROOT, ".bun-version"), "utf8").trim();
+
+    expect(packageJson.packageManager).toBe(`bun@${bunVersion}`);
+    expect(packageJson.engines?.bun).toBe(bunVersion);
+    expect(packageJson.engines?.pnpm).toBeUndefined();
+    expect(existsSync(join(ROOT, "bun.lock"))).toBe(true);
+
+    for (const competingLockfile of ["pnpm-lock.yaml", "package-lock.json", "yarn.lock"]) {
+      expect(existsSync(join(ROOT, competingLockfile)), competingLockfile).toBe(false);
+    }
+  });
+
+  it("keeps executable project surfaces free of pnpm and Corepack", () => {
+    const packageJson = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
+    const executableSurfaces = [
+      JSON.stringify(packageJson.scripts),
+      readFileSync(join(ROOT, ".github/workflows/ci.yml"), "utf8"),
+      readFileSync(join(ROOT, ".github/workflows/migrate.yml"), "utf8"),
+      readFileSync(join(ROOT, ".husky/pre-commit"), "utf8"),
+      readFileSync(join(ROOT, "scripts/setup-dev.mjs"), "utf8"),
+      readFileSync(join(ROOT, "scripts/setup-test-db.mjs"), "utf8"),
+    ];
+
+    expect(executableSurfaces.join("\n")).not.toMatch(/\b(?:pnpm|corepack)\b/i);
+  });
+});
+
 describe("tenancy", () => {
   /**
    * Tables owned by an organization rather than by a user.
@@ -640,11 +670,13 @@ describe("conventions", () => {
 
     expect(offenders).toEqual([]);
 
-    // The two the kit ships with, asserted by name so deleting the gate from an
-    // existing provider fails even if the vendor URL moves into a dependency.
+    // Shipped providers are asserted by name so deleting the gate from one
+    // fails even if the vendor URL moves into a dependency. Naming the Temps
+    // path also pins its browser integration to the providers layer.
     for (const path of [
       "src/providers/google-analytics.tsx",
       "src/providers/adsense.tsx",
+      "src/providers/temps-analytics.tsx",
     ]) {
       const file = FILES.find((f) => f.path === path);
       expect(file, `missing ${path}`).toBeDefined();
@@ -653,6 +685,20 @@ describe("conventions", () => {
         `${path} must gate on useConsent()`,
       ).toBe(true);
     }
+
+    const adminAnalyticsImports = sourceFiles(join(ROOT, "apps/admin"))
+      .map((file) => ({
+        path: relative(ROOT, file),
+        body: stripComments(readFileSync(file, "utf8")),
+      }))
+      .filter(({ body }) =>
+        /@temps-sdk\/react-analytics|temps-analytics|\bTempsAnalytics\b/.test(
+          body,
+        ),
+      )
+      .map(({ path }) => path);
+
+    expect(adminAnalyticsImports).toEqual([]);
   });
 
   it("logs server-side failures through the logger, not console", () => {
@@ -738,6 +784,69 @@ describe("conventions", () => {
     const offenders = FILES.filter(({ body }) =>
       /from\s+["']simple-flakeid["']|@\/lib\/hash/.test(stripComments(body)),
     ).map(({ path }) => path);
+
+    expect(offenders).toEqual([]);
+  });
+
+  it("keeps the middleware free of server dependencies", () => {
+    // Middleware runs on every matched request and must stay fast and
+    // dependency-free. Importing services, models, or the db pulls the whole
+    // server chain — including secrets — into the edge bundle; getAppEnv()
+    // would fail middleware the moment a production secret is missing; and a
+    // fetch from middleware blocks the request on another network call.
+    const offenders: string[] = [];
+
+    const middleware = FILES.find(({ path }) => path === "src/middleware.ts");
+    expect(middleware, "missing src/middleware.ts").toBeDefined();
+
+    for (const specifier of ["@/services", "@/models", "@/db", "@/app"]) {
+      if (importsModule(middleware!.body, specifier)) {
+        offenders.push(`src/middleware.ts imports ${specifier}`);
+      }
+    }
+
+    if (/\bgetAppEnv\s*\(/.test(stripComments(middleware!.body))) {
+      offenders.push("src/middleware.ts calls getAppEnv()");
+    }
+
+    if (/\bfetch\s*\(/.test(stripComments(middleware!.body))) {
+      offenders.push("src/middleware.ts calls fetch()");
+    }
+
+    expect(offenders).toEqual([]);
+  });
+
+  it("keeps country context server-side", () => {
+    // Country is a display and payment default resolved in middleware and
+    // services. A NEXT_PUBLIC_* country variable would leak the default into
+    // client bundles and invite pages to branch on it, splitting the single
+    // resolution path in two.
+    const offenders = FILES.filter(({ body }) =>
+      /NEXT_PUBLIC_(?:COUNTRY|REGION)\w*/.test(stripComments(body)),
+    ).map(({ path }) => path);
+
+    expect(offenders).toEqual([]);
+  });
+
+  it("keeps observability and analytics secrets out of the browser bundle", () => {
+    // NEXT_PUBLIC_* is inlined into client bundles at build time. A Sentry DSN
+    // is public by design, but a Temps API token or an OTEL endpoint is a
+    // credential: shipping it means anyone can replay or tamper with telemetry.
+    // Temps' project slug and API URL are intentionally public SDK config, but
+    // its ingestion key and any platform token must remain server-only.
+    const offenders = [
+      ...FILES,
+      ...sourceFiles(join(ROOT, "apps/admin")).map((file) => ({
+        path: relative(ROOT, file),
+        body: readFileSync(file, "utf8"),
+      })),
+    ]
+      .filter(({ body }) =>
+        /NEXT_PUBLIC_(?:TEMPS_API_KEY|TEMPS_API_TOKEN|OTEL_\w*)/.test(
+          stripComments(body),
+        ),
+      )
+      .map(({ path }) => path);
 
     expect(offenders).toEqual([]);
   });

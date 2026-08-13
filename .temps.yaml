@@ -1,0 +1,11 @@
+health:
+  path: /api/health
+  status: 200
+  interval: 30
+  timeout: 5
+  retries: 3
+
+cron:
+  - path: "/api/cron/jobs"
+    schedule: "*/5 * * * *"
+    name: "Drain application jobs"

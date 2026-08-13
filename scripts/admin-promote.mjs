@@ -3,9 +3,9 @@
  * Promote one existing user to an admin role.
  *
  * Usage:
- *   pnpm admin:promote founder@example.com
- *   pnpm admin:promote founder@example.com admin_ro
- *   pnpm admin:promote founder@example.com --role admin_rw --provider google
+ *   bun run admin:promote founder@example.com
+ *   bun run admin:promote founder@example.com admin_ro
+ *   bun run admin:promote founder@example.com --role admin_rw --provider google
  */
 import "dotenv/config";
 
@@ -15,12 +15,12 @@ const ADMIN_ROLES = new Set(["admin_ro", "admin_rw"]);
 
 function usage() {
   console.log(`Usage:
-  pnpm admin:promote <email> [admin_ro|admin_rw] [--provider <provider>] [--dry-run]
+  bun run admin:promote <email> [admin_ro|admin_rw] [--provider <provider>] [--dry-run]
 
 Examples:
-  pnpm admin:promote founder@example.com
-  pnpm admin:promote founder@example.com admin_ro
-  pnpm admin:promote founder@example.com --provider google
+  bun run admin:promote founder@example.com
+  bun run admin:promote founder@example.com admin_ro
+  bun run admin:promote founder@example.com --provider google
 
 Defaults to admin_rw. If the same email has multiple auth providers, pass
 --provider with the provider shown by the script.

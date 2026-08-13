@@ -189,16 +189,16 @@ were deleted. If you cannot write that sentence, you may not need the test.
 ## Commands
 
 ```bash
-pnpm test          # watch mode
-pnpm test:fast     # hermetic mocked and component tiers
-pnpm test:run      # single pass; real-service tests skip when URLs are absent
-pnpm test:cov      # with coverage; fails below the thresholds
-pnpm test:db       # infrastructure tier (TEST_DATABASE_URL / TEST_REDIS_URL)
+bun run test          # watch mode
+bun run test:fast     # hermetic mocked and component tiers
+bun run test:run      # single pass; real-service tests skip when URLs are absent
+bun run test:cov      # with coverage; fails below the thresholds
+bun run test:db       # infrastructure tier (TEST_DATABASE_URL / TEST_REDIS_URL)
 ```
 
 ### Running the infrastructure tier locally
 
-The simplest path is `pnpm setup`, which starts both services and writes both
+The simplest path is `bun run setup`, which starts both services and writes both
 test URLs. For a manual setup:
 
 ```bash
@@ -211,7 +211,7 @@ export TEST_REDIS_URL=redis://localhost:6379
 ```
 
 ```bash
-pnpm test:db:setup && pnpm test:db
+bun run test:db:setup && bun run test:db
 ```
 
 Or with Docker, then point `TEST_DATABASE_URL` at
@@ -234,10 +234,10 @@ never calls `FLUSHDB`.
 
 ## Where it runs
 
-- **pre-commit** (`.husky/pre-commit`): `pnpm lint && pnpm test:fast` — ~10s.
+- **pre-commit** (`.husky/pre-commit`): `bun run lint && bun run test:fast` — ~10s.
   Fast enough that nobody reaches for `--no-verify`.
-- **prebuild**: `pnpm test:run` runs before every build, local or otherwise.
-- **CI** (`.github/workflows/ci.yml`): lint → migrate test DB → `pnpm test:cov`
+- **prebuild**: `bun run test:run` runs before every build, local or otherwise.
+- **CI** (`.github/workflows/ci.yml`): lint → migrate test DB → `bun run test:cov`
   (all five tiers, thresholds enforced) → build both apps. Postgres 16 and
   Redis 7 service containers back the infrastructure tier.
 

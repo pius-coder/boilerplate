@@ -8,28 +8,28 @@ Keep the notes short, but record what ran, what was skipped, and why.
 Run these from the repository root:
 
 ```bash
-pnpm lint
-pnpm test:run
-pnpm build
+bun run lint
+bun run test:run
+bun run build
 ```
 
 If the change touches `src/db/schema.ts`, migrations, or database-owned
 invariants, also run:
 
 ```bash
-pnpm db:generate
-pnpm db:migrate
-pnpm test:db
+bun run db:generate
+bun run db:migrate
+bun run test:db
 ```
 
 To prove a target database already matches the release artifact, run:
 
 ```bash
-pnpm db:check:prod
+bun run db:check:prod
 ```
 
 The command fails when migrations are pending or the journal has drifted. If
-pending migrations are expected, run `pnpm db:migrate:prod` through the approved
+pending migrations are expected, run `bun run db:migrate:prod` through the approved
 migration workflow first; the apply path verifies the journal again before the
 application is promoted.
 
@@ -60,7 +60,7 @@ application is promoted.
   confirm it exits zero.
 
   ```bash
-  pnpm reconcile:stripe --days 30
+  bun run reconcile:stripe --days 30
   ```
 
   It compares Stripe against this database — a paid order with no ledger row, a
@@ -114,9 +114,9 @@ Include a short validation block in the PR:
 
 ```text
 Validation:
-- pnpm lint
-- pnpm test:run
-- pnpm build
+- bun run lint
+- bun run test:run
+- bun run build
 - Manual: signup, login, checkout/webhook, credits, reservation, upload, team invite
 ```
 

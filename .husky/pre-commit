@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# Fast gate: lint + the mocked test tiers, ~10s. A full `pnpm build` here took
+# Fast gate: lint + the mocked test tiers, ~10s. A full `bun run build` here took
 # long enough that it invited --no-verify, which skipped the tests riding on it.
 # CI still runs lint, tests, and both builds on every push.
-pnpm lint && pnpm test:fast
+bun run lint && bun run test:fast

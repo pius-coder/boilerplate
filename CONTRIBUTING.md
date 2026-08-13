@@ -20,18 +20,18 @@ context, and safe to adapt into a real product.
 Requirements:
 
 - Node.js 20.19 or newer, below Node.js 23
-- pnpm 10.22
+- Bun 1.3.14
 - Docker, or local PostgreSQL 16 and Redis 7 instances
 
 Bootstrap a fresh checkout:
 
 ```bash
-pnpm install --frozen-lockfile
-pnpm setup
-pnpm dev
+bun ci
+bun run setup
+bun run dev
 ```
 
-`pnpm setup` creates local-only secrets, starts the development services, and
+`bun run setup` creates local-only secrets, starts the development services, and
 applies migrations. It never overwrites an existing `.env`.
 
 ## Making a change
@@ -58,16 +58,16 @@ applies migrations. It never overwrites an existing `.env`.
 Run the same core gates as CI:
 
 ```bash
-pnpm lint
-pnpm test:cov
-pnpm build
+bun run lint
+bun run test:cov
+bun run build
 ```
 
 The real-database tier requires `TEST_DATABASE_URL` and `TEST_REDIS_URL`:
 
 ```bash
-pnpm test:db:setup
-pnpm test:db
+bun run test:db:setup
+bun run test:db
 ```
 
 Do not lower coverage thresholds to make a build green.

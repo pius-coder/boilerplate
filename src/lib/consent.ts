@@ -36,7 +36,7 @@ export const CONSENT_COOKIE = "cookie_consent";
  * category. A stored decision from an older version is discarded and the
  * visitor is asked again, because they never agreed to the new thing.
  */
-export const CONSENT_VERSION = 1;
+export const CONSENT_VERSION = 2;
 
 /** Six months. Long enough not to nag, short enough to re-ask periodically. */
 export const CONSENT_MAX_AGE_SECONDS = 60 * 60 * 24 * 182;

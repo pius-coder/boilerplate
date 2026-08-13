@@ -1,11 +1,12 @@
 import { validateAppEnv } from "@/lib/env";
 import { logger } from "@/lib/logger/server";
+import * as Sentry from "@sentry/nextjs";
 
 /**
  * Validate production configuration when the server process boots, before the
  * first customer request can discover a missing Stripe price or secret.
  */
-export function register() {
+export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
     try {
       validateAppEnv();
@@ -19,5 +20,13 @@ export function register() {
       );
       process.exit(1);
     }
+
+    await import("../sentry.server.config");
+  }
+
+  if (process.env.NEXT_RUNTIME === "edge") {
+    await import("../sentry.edge.config");
   }
 }
+
+export const onRequestError = Sentry.captureRequestError;

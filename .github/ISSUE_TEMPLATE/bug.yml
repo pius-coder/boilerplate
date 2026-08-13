@@ -50,7 +50,7 @@ body:
     id: environment
     attributes:
       label: Environment
-      description: Node, pnpm, database, Redis, browser, and deployment platform versions that matter.
+      description: Node, Bun, database, Redis, browser, and deployment platform versions that matter.
     validations:
       required: true
   - type: textarea

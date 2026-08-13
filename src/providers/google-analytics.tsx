@@ -2,6 +2,7 @@
 
 import { GoogleAnalytics as NextGoogleAnalytics } from "@next/third-parties/google";
 
+import { hasTempsAnalytics } from "@/config/analytics";
 import { useConsent } from "@/providers/consent";
 
 /**
@@ -17,7 +18,7 @@ import { useConsent } from "@/providers/consent";
 export function GoogleAnalytics() {
   const { allows } = useConsent();
 
-  if (process.env.NODE_ENV !== "production") {
+  if (process.env.NODE_ENV !== "production" || hasTempsAnalytics()) {
     return null;
   }
 

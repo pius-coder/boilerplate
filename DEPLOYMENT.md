@@ -11,10 +11,10 @@ The short answer on migrations: **they are not automatic, on purpose.** See
 ## Local development
 
 ```bash
-pnpm install && pnpm setup
+bun install && bun run setup
 ```
 
-`pnpm setup` ([scripts/setup-dev.mjs](scripts/setup-dev.mjs)) is idempotent and does three things:
+`bun run setup` ([scripts/setup-dev.mjs](scripts/setup-dev.mjs)) is idempotent and does three things:
 
 1. Writes `.env` from `.env.example`, generating a real `BETTER_AUTH_SECRET` and
    `CRON_SECRET`, pointing `DATABASE_URL` and `TEST_DATABASE_URL` at the local
@@ -27,7 +27,7 @@ pnpm install && pnpm setup
 Then:
 
 ```bash
-pnpm dev
+bun run dev
 ```
 
 Two databases on one server, deliberately: the `tests/db` tier truncates tables
@@ -35,17 +35,17 @@ on every test, so it gets `sushi_test` and never touches your dev data.
 
 | Command                       | Purpose                                                 |
 | ----------------------------- | ------------------------------------------------------- |
-| `pnpm db:up` / `pnpm db:down` | Start / stop the container (data survives `down`)       |
-| `pnpm db:generate`            | Generate migration SQL after editing `src/db/schema.ts` |
-| `pnpm db:migrate`             | Apply migrations locally                                |
-| `pnpm db:studio`              | Drizzle Studio, a browser UI over the data              |
+| `bun run db:up` / `bun run db:down` | Start / stop the container (data survives `down`)       |
+| `bun run db:generate`            | Generate migration SQL after editing `src/db/schema.ts` |
+| `bun run db:migrate`             | Apply migrations locally                                |
+| `bun run db:studio`              | Drizzle Studio, a browser UI over the data              |
 
-To wipe local data entirely: `docker compose down -v`, then `pnpm setup`.
+To wipe local data entirely: `docker compose down -v`, then `bun run setup`.
 
-**Already running Postgres on 5432?** Very common, and `pnpm setup` detects it
+**Already running Postgres on 5432?** Very common, and `bun run setup` detects it
 and stops rather than colliding. Create the two databases on the server you
 already have, point both URLs in `.env` at it, then
-`pnpm db:migrate && pnpm test:db:setup`. Full walkthrough in
+`bun run db:migrate && bun run test:db:setup`. Full walkthrough in
 [docs/database.md](docs/database.md#setting-up-from-a-fresh-clone).
 
 No Docker at all? Same thing — install Postgres however you like, create
@@ -56,10 +56,10 @@ No Docker at all? Same thing — install Postgres however you like, create
 Roles live in `users.role`. Promote the first admin after signing up:
 
 ```bash
-pnpm admin:promote you@example.com
+bun run admin:promote you@example.com
 ```
 
-The command defaults to `admin_rw`. Use `pnpm admin:promote you@example.com
+The command defaults to `admin_rw`. Use `bun run admin:promote you@example.com
 admin_ro` for read-only admin access.
 
 ---
@@ -77,13 +77,13 @@ choice, so a deploy cannot silently end up unprotected:
 
 | Variable                                                  | Why                                                                                     |
 | --------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| `DATABASE_URL`                                            | Everything                                                                              |
+| `DATABASE_URL` or `POSTGRES_URL`                          | Everything; `POSTGRES_URL` is the Temps managed-service alias                           |
 | `BETTER_AUTH_SECRET`                                      | Session signing. `openssl rand -base64 32`                                              |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET_KEY` | Bot protection on auth endpoints. Opt out only with `NEXT_PUBLIC_CAPTCHA_ENABLED=false` |
 | `CRON_SECRET`                                             | Guards `/api/cron/jobs`. `openssl rand -hex 32`                                         |
 | `STRIPE_BILLING_PORTAL_CONFIGURATION_ID`                  | Named `bpc_...` configuration; subscription updates must be disabled                    |
 | `STRIPE_PRICE_{PLUS,MAX}_{MONTHLY,YEARLY}`                | Stable recurring Prices used by checkout, entitlement sync, and renewal grants          |
-| `RATE_LIMIT_REDIS_URL`                                    | Shared rate-limit counters. Use the managed service's TLS `rediss://` URL               |
+| `RATE_LIMIT_REDIS_URL` or `REDIS_URL`                     | Shared rate-limit counters; `REDIS_URL` is the Temps managed-service alias              |
 | `RATE_LIMIT_IP_SOURCE`                                    | The one client-IP header overwritten by the trusted edge                                |
 
 Production validation rejects auth and cron secrets shorter than 32 UTF-8 bytes
@@ -93,6 +93,14 @@ secret across environments or between authentication and cron.
 **Required for the features that use them**: `RESEND_API_KEY` + `EMAIL_FROM`
 (password reset, welcome, payment, reservation mail), `STRIPE_PRIVATE_KEY` +
 `STRIPE_WEBHOOK_SECRET`, and the `STORAGE_*` block.
+
+For Temps/RustFS, normalize the service variables into `STORAGE_*`. The
+application also accepts `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`,
+`AWS_DEFAULT_REGION`, `AWS_ENDPOINT_URL`, and the `S3_*` aliases, but a new
+deployment should expose one convention rather than three. Browser uploads use
+the presigned endpoint directly, so `STORAGE_ENDPOINT` must be the public HTTPS
+S3 API origin—not `localhost`, an internal Docker hostname, or the RustFS
+console port.
 
 Local development may omit `RATE_LIMIT_REDIS_URL` and use the in-memory
 fallback, but production app mode rejects that configuration because an
@@ -122,7 +130,7 @@ starts failing at once. Every managed provider offers a pooler — Neon's `-pool
 host, Supabase's port `6543`, RDS Proxy. Use it for `DATABASE_URL`.
 
 Migrations are the exception: some poolers reject the session-level features DDL
-needs. If `pnpm db:migrate:prod` misbehaves, point it at the **direct**
+needs. If `bun run db:migrate:prod` misbehaves, point it at the **direct**
 (non-pooled) URL and leave the app on the pooled one.
 
 **2. Create the database before migrating.** Drizzle applies migrations; it does
@@ -143,8 +151,8 @@ See [docs/database.md](docs/database.md) for the table catalogue, the invariants
 and the per-change checklist.
 
 ```bash
-pnpm db:generate    # after editing schema.ts — writes src/db/migrations/NNNN_*.sql
-pnpm db:migrate     # apply locally
+bun run db:generate    # after editing schema.ts — writes src/db/migrations/NNNN_*.sql
+bun run db:migrate     # apply locally
 ```
 
 Commit both the `.sql` file and the updated `meta/_journal.json`. Drizzle tracks
@@ -176,11 +184,11 @@ when migrations are pending, when an applied SQL hash differs, or when the
 database is ahead of the checked-out release:
 
 ```bash
-DATABASE_URL=postgres://... pnpm db:check:prod
+DATABASE_URL=postgres://... bun run db:check:prod
 ```
 
 ```bash
-DATABASE_URL=postgres://... pnpm db:migrate:prod
+DATABASE_URL=postgres://... bun run db:migrate:prod
 ```
 
 [scripts/migrate.mjs](scripts/migrate.mjs) differs from `drizzle-kit migrate` in ways that matter for a
@@ -241,8 +249,8 @@ Two apps deploy independently from one repository:
 
 | App   | Build                                      | Serves                                |
 | ----- | ------------------------------------------ | ------------------------------------- |
-| Web   | `pnpm build:web`                           | SaaS application, auth, checkout, API |
-| Admin | `pnpm build:admin` (root dir `apps/admin`) | Admin console, `/api/admin/*`         |
+| Web   | `bun run build:web`                           | SaaS application, auth, checkout, API |
+| Admin | `bun run build:admin` (root dir `apps/admin`) | Admin console, `/api/admin/*`         |
 
 On Vercel that is two projects on the same repo. The admin project needs the same
 `DATABASE_URL`, `BETTER_AUTH_SECRET`, and Turnstile keys — admin sign-in goes
@@ -254,20 +262,58 @@ in [docs/release-checklist.md](docs/release-checklist.md). It covers the command
 gate plus the core manual smoke checks: signup, login, checkout, webhook,
 credits, reservations, upload, localized homepage, and teammate invitation.
 
-`pnpm build` runs `pnpm test:run` first via `prebuild`, so a broken test blocks a
+`bun run build` runs `bun run test:run` first via `prebuild`, so a broken test blocks a
 deploy without any extra CI wiring.
+
+### Temps (optional)
+
+Temps is optional; the application remains deployable without it. Both Next
+configs emit `output: "standalone"`. Build two independent artifacts from the
+repository root:
+
+```bash
+bun run build:web
+bun run build:admin
+```
+
+Configure the web and admin as **two distinct Temps projects**. The web project
+uses the root `.temps.yaml`, whose liveness probe is `/api/health` and whose
+five-minute cron calls `/api/cron/jobs`. Both web and admin expose dependency-free
+GET and HEAD `/api/health` handlers. Temps invokes the cron with GET and
+`Authorization: Bearer $CRON_SECRET`; the route still validates that secret.
+
+The admin app has no separate `.temps.yaml`. Configure its Temps project from
+the repository root with `bun run build:admin`; do not change the project root to
+`apps/admin`. The artifacts remain separate, and admin contains no browser
+analytics.
+
+Temps injects `NEXT_PUBLIC_SENTRY_DSN` for its Sentry-compatible error tracker.
+The web app initializes the official Next.js SDK on the client, Node.js server,
+and Edge runtime only when that DSN exists. Session replay masks all text and
+blocks media, and Sentry PII collection stays disabled. Do not copy the deployed
+DSN into source; set it manually only for local verification. OpenTelemetry is
+not initialized yet. No real Temps deployment or remote smoke check has been
+verified.
+
+Temps analytics uses a separate least-privilege ingestion key. Create a Custom
+API key with only `analytics:write`, store it as server-only `TEMPS_API_KEY`,
+and configure `NEXT_PUBLIC_PROJECT_SLUG` plus `NEXT_PUBLIC_TEMPS_API_URL`. The
+three variables are an all-or-none group; `bun run deploy:check` rejects a
+partial setup without printing their values.
 
 ### Background jobs
 
-[vercel.json](vercel.json) registers a cron hitting `/api/cron/jobs` every 5 minutes, which is
-what drains the `jobs` table (welcome emails, signup credits). Vercel sends
-`CRON_SECRET` as an `Authorization` header automatically once it is set on the
-project. **Off Vercel, you must schedule this yourself** — otherwise queued jobs
-sit forever and users silently stop receiving welcome mail. Any scheduler works:
+[vercel.json](vercel.json) remains the portable Vercel declaration for a cron
+hitting `/api/cron/jobs` every 5 minutes, which drains the `jobs` table (welcome
+emails, signup credits). Vercel sends `CRON_SECRET` as an `Authorization` header
+when it is set on the project. **Off Vercel and Temps, you must schedule this
+yourself** — otherwise queued jobs sit forever and users silently stop receiving
+welcome mail. Any scheduler works:
 
 ```bash
 curl -H "Authorization: Bearer $CRON_SECRET" https://your-domain.com/api/cron/jobs
 ```
+
 
 ### Stripe webhook
 
@@ -295,7 +341,7 @@ verify the auth/email smoke checks in `docs/release-checklist.md`.
 ### First production deploy
 
 - [ ] Managed Postgres created; **pooled** URL for the app, direct URL noted for migrations
-- [ ] `pnpm db:migrate:prod` run against it and verified with `pnpm db:check:prod`
+- [ ] `bun run db:migrate:prod` run against it and verified with `bun run db:check:prod`
 - [ ] `BETTER_AUTH_SECRET` and `CRON_SECRET` generated fresh — not copied from `.env`
 - [ ] Real Turnstile keys set on **both** the web and admin projects
 - [ ] Resend domain verified (SPF + DKIM + DMARC), `EMAIL_FROM` on that domain
@@ -305,12 +351,12 @@ verify the auth/email smoke checks in `docs/release-checklist.md`.
 - [ ] `NEXT_PUBLIC_WEB_URL`, `BETTER_AUTH_URL`, `NEXT_PUBLIC_ADMIN_WEB_URL` set to real origins
 - [ ] Cron scheduled against `/api/cron/jobs`
 - [ ] Demo flags absent
-- [ ] First admin promoted with `pnpm admin:promote you@example.com`
+- [ ] First admin promoted with `bun run admin:promote you@example.com`
 - [ ] Point-in-time restore confirmed available
 
 ### Every schema change
 
-- [ ] `src/db/schema.ts` edited, `pnpm db:generate` run, both files committed
+- [ ] `src/db/schema.ts` edited, `bun run db:generate` run, both files committed
 - [ ] Migration reviewed for expand/contract safety — does the **currently deployed** code still work against it?
-- [ ] `pnpm test:db` passes locally against `sushi_test`
+- [ ] `bun run test:db` passes locally against `sushi_test`
 - [ ] Migration applied via the workflow (`check`, then `apply`) **before** the code deploy is promoted

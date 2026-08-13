@@ -12,6 +12,7 @@ const ENV_KEYS = [
   "BETTER_AUTH_URL",
   "NEXT_PUBLIC_AUTH_BASE_URL",
   "DATABASE_URL",
+  "POSTGRES_URL",
   "BETTER_AUTH_SECRET",
   "AUTH_SECRET",
   "STRIPE_PRIVATE_KEY",
@@ -46,10 +47,14 @@ const ENV_KEYS = [
   "STORAGE_BUCKET",
   "STORAGE_PROVIDER",
   "S3_BUCKET",
+  "S3_ACCESS_KEY",
   "STORAGE_ACCESS_KEY",
   "S3_ACCESS_KEY_ID",
+  "AWS_ACCESS_KEY_ID",
   "STORAGE_SECRET_KEY",
+  "S3_SECRET_KEY",
   "S3_SECRET_ACCESS_KEY",
+  "AWS_SECRET_ACCESS_KEY",
   "ENABLE_DEMO_FEATURES",
   "ENABLE_CREDITS_PLAYGROUND",
   "ENABLE_TEXT2VIDEO_MOCK",
@@ -57,6 +62,8 @@ const ENV_KEYS = [
   "NEXT_PUBLIC_UPLOAD_MAX_MB",
   "STORAGE_ENDPOINT",
   "S3_ENDPOINT",
+  "AWS_ENDPOINT_URL",
+  "AWS_DEFAULT_REGION",
   "LOG_LEVEL",
   "NEXT_PUBLIC_CAPTCHA_ENABLED",
   "NEXT_PUBLIC_TURNSTILE_SITE_KEY",
@@ -64,7 +71,13 @@ const ENV_KEYS = [
   "CRON_SECRET",
   "NEXT_PUBLIC_DOCS_URL",
   "RATE_LIMIT_REDIS_URL",
+  "REDIS_URL",
   "RATE_LIMIT_IP_SOURCE",
+  "COUNTRY_DETECTION_HEADER",
+  "TEMPS_API_KEY",
+  "NEXT_PUBLIC_PROJECT_SLUG",
+  "NEXT_PUBLIC_TEMPS_API_URL",
+  "NEXT_PUBLIC_SENTRY_DSN",
 ];
 
 async function loadEnvModule() {
@@ -141,7 +154,7 @@ describe("typed environment validation", () => {
       expect((error as any).issues).toEqual(
         expect.arrayContaining([
           "NEXT_PUBLIC_WEB_URL",
-          "DATABASE_URL",
+          "DATABASE_URL (or POSTGRES_URL)",
           "BETTER_AUTH_SECRET (or AUTH_SECRET)",
           "CRON_SECRET",
           "RATE_LIMIT_IP_SOURCE",
@@ -164,7 +177,10 @@ describe("typed environment validation", () => {
       throw new Error("expected validation to fail");
     } catch (error) {
       expect((error as any).issues).toEqual(
-        expect.arrayContaining(["DATABASE_URL", "STRIPE_PRIVATE_KEY"]),
+        expect.arrayContaining([
+          "DATABASE_URL (or POSTGRES_URL)",
+          "STRIPE_PRIVATE_KEY",
+        ]),
       );
     }
   });
@@ -255,7 +271,7 @@ describe("typed environment validation", () => {
       validateAppEnv();
     } catch (error) {
       expect((error as any).issues).toEqual(
-        expect.arrayContaining(["RATE_LIMIT_REDIS_URL"]),
+        expect.arrayContaining(["RATE_LIMIT_REDIS_URL (or REDIS_URL)"]),
       );
     }
   });
@@ -355,6 +371,48 @@ describe("typed environment validation", () => {
     expect(env.STORAGE_BUCKET).toBe("alias-bucket");
     expect(env.STORAGE_ACCESS_KEY).toBe("alias-access");
     expect(env.STORAGE_SECRET_KEY).toBe("alias-secret");
+  });
+
+  it("normalizes Temps managed-service aliases", async () => {
+    setProductionEnv();
+    delete process.env.DATABASE_URL;
+    delete process.env.RATE_LIMIT_REDIS_URL;
+    delete process.env.STORAGE_ACCESS_KEY;
+    delete process.env.STORAGE_SECRET_KEY;
+    vi.stubEnv("POSTGRES_URL", "postgresql://app:secret@postgres.internal:5432/app");
+    vi.stubEnv("REDIS_URL", "redis://:secret@redis.internal:6379");
+    vi.stubEnv("AWS_ACCESS_KEY_ID", "temps-access");
+    vi.stubEnv("AWS_SECRET_ACCESS_KEY", "temps-secret");
+    vi.stubEnv("AWS_DEFAULT_REGION", "us-east-1");
+
+    const { validateAppEnv } = await loadEnvModule();
+    const env = validateAppEnv();
+
+    expect(env.DATABASE_URL).toBe(
+      "postgresql://app:secret@postgres.internal:5432/app",
+    );
+    expect(env.RATE_LIMIT_REDIS_URL).toBe(
+      "redis://:secret@redis.internal:6379",
+    );
+    expect(env.STORAGE_ACCESS_KEY).toBe("temps-access");
+    expect(env.STORAGE_SECRET_KEY).toBe("temps-secret");
+    expect(env.STORAGE_REGION).toBe("us-east-1");
+  });
+
+  it("rejects storage endpoints that a production browser cannot reach safely", async () => {
+    setProductionEnv();
+    vi.stubEnv("STORAGE_ENDPOINT", "http://localhost:9001");
+
+    const { EnvValidationError, validateAppEnv } = await loadEnvModule();
+
+    expect(() => validateAppEnv()).toThrow(EnvValidationError);
+    try {
+      validateAppEnv();
+    } catch (error) {
+      expect((error as any).issues).toContain(
+        "STORAGE_ENDPOINT (must be a browser-reachable HTTPS S3 API endpoint in production; localhost, internal-only names, and console ports cannot serve presigned uploads)",
+      );
+    }
   });
 
   it("fails clearly for unsupported storage providers", async () => {
@@ -468,5 +526,125 @@ describe("typed environment validation", () => {
     const { validateAppEnv } = await loadEnvModule();
 
     expect(validateAppEnv().NEXT_PUBLIC_WEB_URL).toBe("http://localhost:3000");
+  });
+
+  it("treats an absent country detection header as detection disabled", async () => {
+    vi.stubEnv("NODE_ENV", "test");
+
+    const { validateAppEnv } = await loadEnvModule();
+
+    expect(validateAppEnv().COUNTRY_DETECTION_HEADER).toBeUndefined();
+  });
+
+  it("accepts only the closed list of country detection headers", async () => {
+    const supported = [
+      "cf-ipcountry",
+      "x-vercel-ip-country",
+      "cloudfront-viewer-country",
+      "x-country-code",
+    ];
+
+    for (const name of supported) {
+      vi.stubEnv("NODE_ENV", "test");
+      vi.stubEnv("COUNTRY_DETECTION_HEADER", name.toUpperCase());
+
+      const { validateAppEnv } = await loadEnvModule();
+      expect(validateAppEnv().COUNTRY_DETECTION_HEADER).toBe(name);
+    }
+  });
+
+  it("fails clearly for an unsupported country detection header", async () => {
+    vi.stubEnv("NODE_ENV", "test");
+    vi.stubEnv("COUNTRY_DETECTION_HEADER", "x-real-ip");
+
+    const { EnvValidationError, validateAppEnv } = await loadEnvModule();
+
+    expect(() => validateAppEnv()).toThrow(EnvValidationError);
+    try {
+      validateAppEnv();
+    } catch (error) {
+      expect((error as Error).message).toContain(
+        "Expected one of: cf-ipcountry, x-vercel-ip-country, cloudfront-viewer-country, x-country-code",
+      );
+      expect((error as any).issues).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining("COUNTRY_DETECTION_HEADER"),
+        ]),
+      );
+    }
+  });
+
+  it("keeps Temps analytics optional when all three variables are absent", async () => {
+    vi.stubEnv("NODE_ENV", "test");
+
+    const { validateAppEnv } = await loadEnvModule();
+
+    expect(validateAppEnv().TEMPS_API_KEY).toBeUndefined();
+  });
+
+  it("accepts the complete canonical Temps analytics configuration", async () => {
+    vi.stubEnv("NODE_ENV", "test");
+    vi.stubEnv("TEMPS_API_KEY", "temps-secret");
+    vi.stubEnv("NEXT_PUBLIC_PROJECT_SLUG", "boilerplate");
+    vi.stubEnv("NEXT_PUBLIC_TEMPS_API_URL", "https://temps.example.com");
+
+    const { validateAppEnv } = await loadEnvModule();
+    const env = validateAppEnv();
+
+    expect(env.TEMPS_API_KEY).toBe("temps-secret");
+    expect(env.NEXT_PUBLIC_PROJECT_SLUG).toBe("boilerplate");
+    expect(env.NEXT_PUBLIC_TEMPS_API_URL).toBe("https://temps.example.com");
+  });
+
+  it.each(["TEMPS_API_KEY", "NEXT_PUBLIC_PROJECT_SLUG", "NEXT_PUBLIC_TEMPS_API_URL"])(
+    "rejects partial Temps analytics config missing %s",
+    async (missingKey) => {
+      vi.stubEnv("NODE_ENV", "test");
+      vi.stubEnv("TEMPS_API_KEY", "temps-secret");
+      vi.stubEnv("NEXT_PUBLIC_PROJECT_SLUG", "boilerplate");
+      vi.stubEnv("NEXT_PUBLIC_TEMPS_API_URL", "https://temps.example.com");
+      delete process.env[missingKey];
+
+      const { EnvValidationError, validateAppEnv } = await loadEnvModule();
+
+      expect(() => validateAppEnv()).toThrow(EnvValidationError);
+      expect(() => validateAppEnv()).toThrow(
+        "Temps analytics requires TEMPS_API_KEY, NEXT_PUBLIC_PROJECT_SLUG, and NEXT_PUBLIC_TEMPS_API_URL together",
+      );
+    },
+  );
+
+  it("refuses Temps analytics and Google Analytics at the same time", async () => {
+    vi.stubEnv("NODE_ENV", "test");
+    vi.stubEnv("TEMPS_API_KEY", "temps-secret");
+    vi.stubEnv("NEXT_PUBLIC_PROJECT_SLUG", "boilerplate");
+    vi.stubEnv("NEXT_PUBLIC_TEMPS_API_URL", "https://temps.example.com");
+    vi.stubEnv("NEXT_PUBLIC_GOOGLE_ANALYTICS_ID", "G-ABC123");
+
+    const { EnvValidationError, validateAppEnv } = await loadEnvModule();
+
+    expect(() => validateAppEnv()).toThrow(EnvValidationError);
+    try {
+      validateAppEnv();
+    } catch (error) {
+      expect((error as Error).message).toContain("Invalid configuration");
+      expect((error as any).issues).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining("Temps analytics"),
+          expect.stringContaining("NEXT_PUBLIC_GOOGLE_ANALYTICS_ID"),
+        ]),
+      );
+    }
+  });
+
+  it("allows Google Analytics alone when Temps is off", async () => {
+    vi.stubEnv("NODE_ENV", "test");
+    vi.stubEnv("NEXT_PUBLIC_GOOGLE_ANALYTICS_ID", "G-ABC123");
+
+    const { validateAppEnv } = await loadEnvModule();
+    const env = validateAppEnv();
+
+    expect(env.TEMPS_API_KEY).toBeUndefined();
+    expect(env.NEXT_PUBLIC_GOOGLE_ANALYTICS_ID).toBe("G-ABC123");
   });
 });

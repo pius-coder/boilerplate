@@ -29,7 +29,7 @@ import {
 /**
  * Reconciliation: does what this database recorded match what it promised?
  *
- * The findings already existed — `pnpm reconcile:stripe --local-only` has
+ * The findings already existed — `bun run reconcile:stripe --local-only` has
  * computed them since item 5 — and were reachable only by someone with a
  * checkout, a database URL, and a terminal. That is the wrong audience: the
  * person who needs to know a customer paid and got no credits is whoever is
@@ -140,7 +140,7 @@ export default async function AdminReconciliationPage({
         This is the <strong>local</strong> half: it compares this database
         against itself and needs no Stripe key. It cannot detect &ldquo;Stripe
         charged them and we were never told&rdquo; — that requires walking the
-        invoice API, which stays in <code>pnpm reconcile:stripe</code>. Findings
+        invoice API, which stays in <code>bun run reconcile:stripe</code>. Findings
         are capped at {FINDING_LIMIT} per check.
       </AdminHelp>
 

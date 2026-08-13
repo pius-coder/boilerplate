@@ -16,6 +16,8 @@ const SENSITIVE_KEY_PARTS = [
   "privatekey",
   "credential",
   "databaseurl",
+  "postgresurl",
+  "redisurl",
   "connectionstring",
 ];
 

@@ -13,7 +13,17 @@
  */
 
 export function hasAnalytics(): boolean {
-  return Boolean(process.env.NEXT_PUBLIC_GOOGLE_ANALYTICS_ID);
+  return (
+    hasTempsAnalytics() || Boolean(process.env.NEXT_PUBLIC_GOOGLE_ANALYTICS_ID)
+  );
+}
+
+/** True when the public half of the canonical Temps configuration is complete. */
+export function hasTempsAnalytics(): boolean {
+  return Boolean(
+    process.env.NEXT_PUBLIC_PROJECT_SLUG &&
+      process.env.NEXT_PUBLIC_TEMPS_API_URL,
+  );
 }
 
 export function hasAdvertising(): boolean {

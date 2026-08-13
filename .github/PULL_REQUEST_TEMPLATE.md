@@ -4,10 +4,10 @@
 
 ## Validation
 
-- [ ] `pnpm lint`
-- [ ] `pnpm test:cov`
-- [ ] `pnpm test:db` when an infrastructure invariant changed
-- [ ] `pnpm build`
+- [ ] `bun run lint`
+- [ ] `bun run test:cov`
+- [ ] `bun run test:db` when an infrastructure invariant changed
+- [ ] `bun run build`
 - [ ] Manual happy path documented for auth, billing, i18n, or storage changes
 
 ## Deployment and compatibility

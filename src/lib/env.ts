@@ -1,5 +1,10 @@
 import { z } from "zod";
 
+import {
+  SUPPORTED_COUNTRY_DETECTION_HEADERS,
+  type SupportedCountryDetectionHeader,
+} from "@/config/country-context";
+
 const TRUE_VALUES = new Set(["1", "true", "yes", "on"]);
 const FALSE_VALUES = new Set(["0", "false", "no", "off"]);
 const STORAGE_PROVIDERS = ["s3", "r2", "minio"] as const;
@@ -106,6 +111,42 @@ const envStorageProvider = z
     return z.NEVER;
   });
 
+/**
+ * Closed-list validation for the country-detection header.
+ *
+ * Absent/empty means "detection disabled" and is always valid. Anything set
+ * must be one of the four supported geo-header names, or boot fails loudly:
+ * a typo must not silently turn detection off in production. The middleware
+ * reads this variable as raw `process.env` (it must not call `getAppEnv()`),
+ * so this schema exists to give every other server context the same contract.
+ */
+const envCountryDetectionHeader = z
+  .preprocess(emptyToUndefined, z.string().trim().optional())
+  .transform((value, ctx): SupportedCountryDetectionHeader | undefined => {
+    if (value === undefined) {
+      return undefined;
+    }
+
+    const normalized = value.toLowerCase();
+    if (
+      SUPPORTED_COUNTRY_DETECTION_HEADERS.includes(
+        normalized as SupportedCountryDetectionHeader,
+      )
+    ) {
+      return normalized as SupportedCountryDetectionHeader;
+    }
+
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `Expected one of: ${SUPPORTED_COUNTRY_DETECTION_HEADERS.join(
+        ", ",
+      )}. Received ${JSON.stringify(
+        value.length > 40 ? `${value.slice(0, 40)}…` : value,
+      )}`,
+    });
+    return z.NEVER;
+  });
+
 const RawEnvSchema = z.object({
   NODE_ENV: z
     .enum(["development", "test", "production"])
@@ -127,6 +168,9 @@ const RawEnvSchema = z.object({
   NEXT_PUBLIC_LOCALE_DETECTION: envBoolean(false),
 
   DATABASE_URL: envString,
+  // Managed-service aliases injected by platforms such as Temps. The app
+  // normalizes these once; callers continue to depend on DATABASE_URL.
+  POSTGRES_URL: envString,
   BETTER_AUTH_SECRET: envString,
   AUTH_SECRET: envString,
   GOOGLE_CLIENT_ID: envString,
@@ -200,9 +244,15 @@ const RawEnvSchema = z.object({
   NEXT_PUBLIC_UPLOAD_MAX_MB: envPositiveInt(25),
   S3_ENDPOINT: envUrl,
   S3_REGION: envString,
+  S3_ACCESS_KEY: envString,
   S3_ACCESS_KEY_ID: envString,
+  S3_SECRET_KEY: envString,
   S3_SECRET_ACCESS_KEY: envString,
   S3_BUCKET: envString,
+  AWS_ENDPOINT_URL: envUrl,
+  AWS_DEFAULT_REGION: envString,
+  AWS_ACCESS_KEY_ID: envString,
+  AWS_SECRET_ACCESS_KEY: envString,
   S3_FORCE_PATH_STYLE: envBoolean(false),
   S3_USE_ACL: envBoolean(false),
 
@@ -211,10 +261,22 @@ const RawEnvSchema = z.object({
   ADMIN_MAX_CREDIT_GRANT: envPositiveInt(100000),
 
   RATE_LIMIT_REDIS_URL: envRedisUrl,
+  REDIS_URL: envRedisUrl,
   RATE_LIMIT_IP_SOURCE: z.preprocess(
     emptyToUndefined,
     z.enum(RATE_LIMIT_IP_SOURCES).optional(),
   ),
+
+  /**
+   * Country detection for the internal `x-app-country` context header, OFF by
+   * default. When set, must be one of the supported geo-header names
+   * (`src/config/country-context.ts`); an invalid value fails environment
+   * validation instead of silently disabling detection. The trusted
+   * proxy/CDN is then responsible for overwriting that header and stripping
+   * client-supplied copies. Read directly as `process.env` in the middleware,
+   * never through `getAppEnv()` — middleware must not pull production secrets.
+   */
+  COUNTRY_DETECTION_HEADER: envCountryDetectionHeader,
 
   ENABLE_DEMO_FEATURES: envBoolean(false),
   ENABLE_CREDITS_PLAYGROUND: envBoolean(false),
@@ -227,6 +289,11 @@ const RawEnvSchema = z.object({
 
   NEXT_PUBLIC_GOOGLE_ANALYTICS_ID: envString,
   NEXT_PUBLIC_GOOGLE_ADCODE: envString,
+  TEMPS_API_KEY: envString,
+  NEXT_PUBLIC_PROJECT_SLUG: envString,
+  NEXT_PUBLIC_TEMPS_API_URL: envUrl,
+  // Public ingestion endpoint by design; Temps injects it at deployment time.
+  NEXT_PUBLIC_SENTRY_DSN: envUrl,
   LOG_LEVEL: z
     .preprocess(
       emptyToUndefined,
@@ -330,13 +397,25 @@ function buildAppEnv(raw: RawEnv): AppEnv {
     NEXT_PUBLIC_APP_NAME: raw.NEXT_PUBLIC_APP_NAME ?? "Your SaaS",
     NEXT_PUBLIC_PROJECT_NAME: raw.NEXT_PUBLIC_PROJECT_NAME ?? "your-saas",
     NEXT_PUBLIC_DEFAULT_THEME: raw.NEXT_PUBLIC_DEFAULT_THEME ?? "system",
+    DATABASE_URL: raw.DATABASE_URL ?? raw.POSTGRES_URL,
     BETTER_AUTH_SECRET: raw.BETTER_AUTH_SECRET ?? raw.AUTH_SECRET,
     STORAGE_PROVIDER: raw.STORAGE_PROVIDER,
-    STORAGE_ENDPOINT: raw.STORAGE_ENDPOINT ?? raw.S3_ENDPOINT,
-    STORAGE_REGION: raw.STORAGE_REGION ?? raw.S3_REGION ?? "auto",
-    STORAGE_ACCESS_KEY: raw.STORAGE_ACCESS_KEY ?? raw.S3_ACCESS_KEY_ID,
-    STORAGE_SECRET_KEY: raw.STORAGE_SECRET_KEY ?? raw.S3_SECRET_ACCESS_KEY,
+    STORAGE_ENDPOINT:
+      raw.STORAGE_ENDPOINT ?? raw.S3_ENDPOINT ?? raw.AWS_ENDPOINT_URL,
+    STORAGE_REGION:
+      raw.STORAGE_REGION ?? raw.S3_REGION ?? raw.AWS_DEFAULT_REGION ?? "auto",
+    STORAGE_ACCESS_KEY:
+      raw.STORAGE_ACCESS_KEY ??
+      raw.S3_ACCESS_KEY_ID ??
+      raw.S3_ACCESS_KEY ??
+      raw.AWS_ACCESS_KEY_ID,
+    STORAGE_SECRET_KEY:
+      raw.STORAGE_SECRET_KEY ??
+      raw.S3_SECRET_ACCESS_KEY ??
+      raw.S3_SECRET_KEY ??
+      raw.AWS_SECRET_ACCESS_KEY,
     STORAGE_BUCKET: raw.STORAGE_BUCKET ?? raw.S3_BUCKET,
+    RATE_LIMIT_REDIS_URL: raw.RATE_LIMIT_REDIS_URL ?? raw.REDIS_URL,
     RATE_LIMIT_IP_SOURCE: raw.RATE_LIMIT_IP_SOURCE ?? "x-forwarded-for",
   };
 }
@@ -389,7 +468,7 @@ function getMissingProductionEnv(raw: RawEnv, env: AppEnv): string[] {
 
   requireRaw(raw.BETTER_AUTH_URL, "BETTER_AUTH_URL");
   requireRaw(raw.NEXT_PUBLIC_AUTH_BASE_URL, "NEXT_PUBLIC_AUTH_BASE_URL");
-  requireRaw(raw.DATABASE_URL, "DATABASE_URL");
+  requireResolved(env.DATABASE_URL, "DATABASE_URL (or POSTGRES_URL)");
   requireResolved(
     env.BETTER_AUTH_SECRET,
     "BETTER_AUTH_SECRET (or AUTH_SECRET)",
@@ -441,7 +520,10 @@ function getMissingProductionEnv(raw: RawEnv, env: AppEnv): string[] {
   // The in-memory fallback is correct for one local process but is not a
   // production rate limiter: every serverless instance would keep a different
   // counter. A production app must therefore have one shared Redis store.
-  requireRaw(raw.RATE_LIMIT_REDIS_URL, "RATE_LIMIT_REDIS_URL");
+  requireResolved(
+    env.RATE_LIMIT_REDIS_URL,
+    "RATE_LIMIT_REDIS_URL (or REDIS_URL)",
+  );
   // Fetch `Request` has no socket address. The app must know which header the
   // trusted edge overwrites; otherwise accepting an arbitrary X-Forwarded-For
   // value lets a caller choose a fresh limiter identity on every request.
@@ -476,6 +558,17 @@ function getInvalidProductionEnv(raw: RawEnv, env: AppEnv): string[] {
   }
 
   const invalid: string[] = [];
+
+  if (env.STORAGE_ENDPOINT) {
+    const endpoint = new URL(env.STORAGE_ENDPOINT);
+    const localHostnames = new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);
+
+    if (localHostnames.has(endpoint.hostname) || endpoint.protocol !== "https:") {
+      invalid.push(
+        "STORAGE_ENDPOINT (must be a browser-reachable HTTPS S3 API endpoint in production; localhost, internal-only names, and console ports cannot serve presigned uploads)",
+      );
+    }
+  }
 
   if (
     env.BETTER_AUTH_SECRET &&
@@ -553,6 +646,36 @@ function getInvalidProductionEnv(raw: RawEnv, env: AppEnv): string[] {
   return invalid;
 }
 
+function getInvalidConfigEnv(raw: RawEnv): string[] {
+  const tempsValues = [
+    raw.TEMPS_API_KEY,
+    raw.NEXT_PUBLIC_PROJECT_SLUG,
+    raw.NEXT_PUBLIC_TEMPS_API_URL,
+  ];
+  const configuredTempsValues = tempsValues.filter(Boolean).length;
+
+  if (configuredTempsValues > 0 && configuredTempsValues < tempsValues.length) {
+    return [
+      "Temps analytics requires TEMPS_API_KEY, NEXT_PUBLIC_PROJECT_SLUG, and NEXT_PUBLIC_TEMPS_API_URL together",
+    ];
+  }
+
+  // Temps is the recommended analytics target and the two vendors are mutually
+  // exclusive: running both doubles tracking identifiers for the same visits
+  // and splits the data story in two dashboards. Refuse the contradiction
+  // instead of letting the operator discover it after weeks of double counts.
+  if (
+    configuredTempsValues === tempsValues.length &&
+    raw.NEXT_PUBLIC_GOOGLE_ANALYTICS_ID
+  ) {
+    return [
+      "Temps analytics and NEXT_PUBLIC_GOOGLE_ANALYTICS_ID are mutually exclusive; keep Temps (recommended) and remove the Google Analytics id",
+    ];
+  }
+
+  return [];
+}
+
 export function validateAppEnv(): AppEnv {
   if (cachedEnv) {
     return cachedEnv;
@@ -575,8 +698,16 @@ export function validateAppEnv(): AppEnv {
   const missing = getMissingProductionEnv(parsed.data, env);
   const forbidden = getForbiddenProductionEnv(env);
   const invalid = getInvalidProductionEnv(parsed.data, env);
+  // Unlike the production-only sections above, this one runs everywhere: the
+  // GA/Temps contradiction is a configuration mistake, not a production hazard.
+  const config = getInvalidConfigEnv(parsed.data);
 
-  if (missing.length > 0 || forbidden.length > 0 || invalid.length > 0) {
+  if (
+    missing.length > 0 ||
+    forbidden.length > 0 ||
+    invalid.length > 0 ||
+    config.length > 0
+  ) {
     const sections: string[] = [];
     if (missing.length > 0) {
       sections.push(
@@ -595,11 +726,15 @@ export function validateAppEnv(): AppEnv {
         `Invalid production environment variables:\n- ${invalid.join("\n- ")}`,
       );
     }
+    if (config.length > 0) {
+      sections.push(`Invalid configuration:\n- ${config.join("\n- ")}`);
+    }
 
     throw new EnvValidationError(sections.join("\n\n"), [
       ...missing,
       ...forbidden,
       ...invalid,
+      ...config,
     ]);
   }
 

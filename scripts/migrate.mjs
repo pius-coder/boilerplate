@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * Apply migrations to a deployed database. `pnpm db:migrate:prod`
+ * Apply migrations to a deployed database. `bun run db:migrate:prod`
  *
- * Separate from `pnpm db:migrate` (drizzle-kit, for local use) because a
+ * Separate from `bun run db:migrate` (drizzle-kit, for local use) because a
  * production migration has requirements a dev one does not:
  *
  *   - It runs from a release pipeline, so it must be non-interactive and exit

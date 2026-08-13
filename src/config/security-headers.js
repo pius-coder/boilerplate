@@ -36,6 +36,7 @@
  * @property {string} [analyticsId] Google Analytics measurement id, when configured.
  * @property {string} [adsenseCode] AdSense publisher code, when configured.
  * @property {string} [turnstileSiteKey] Turnstile site key, when configured.
+ * @property {string} [sentryDsn] Public Sentry-compatible ingestion DSN.
  * @property {string} [reportUri] Where violation reports are POSTed.
  * @property {Partial<Record<CspDirective, string[]>>} [extra] Extra sources per
  *   directive, for whatever this deployment adds — an S3 or R2 bucket, a support
@@ -58,6 +59,20 @@ function dedupe(values) {
 }
 
 /**
+ * @param {string | undefined} value
+ * @returns {string | undefined}
+ */
+function urlOrigin(value) {
+  if (!value) return undefined;
+
+  try {
+    return new URL(value).origin;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * @param {BuildOptions} [options]
  * @returns {string}
  */
@@ -67,6 +82,7 @@ function buildContentSecurityPolicy(options = {}) {
   const adsenseCode = options.adsenseCode ?? process.env.NEXT_PUBLIC_GOOGLE_ADCODE;
   const turnstileSiteKey =
     options.turnstileSiteKey ?? process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+  const sentryDsn = options.sentryDsn ?? process.env.NEXT_PUBLIC_SENTRY_DSN;
   const reportUri = options.reportUri ?? process.env.CSP_REPORT_URI;
 
   const script = ["'self'", "'unsafe-inline'"];
@@ -105,6 +121,11 @@ function buildContentSecurityPolicy(options = {}) {
   if (turnstileSiteKey) {
     script.push("https://challenges.cloudflare.com");
     frame.push("https://challenges.cloudflare.com");
+  }
+
+  const sentryOrigin = urlOrigin(sentryDsn);
+  if (sentryOrigin) {
+    connect.push(sentryOrigin);
   }
 
   /** @type {Record<CspDirective, string[]>} */

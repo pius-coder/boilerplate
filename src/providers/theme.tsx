@@ -6,6 +6,7 @@ import { useLocale } from "next-intl";
 import { Toaster } from "sonner";
 import Adsense from "./adsense";
 import { GoogleAnalytics } from "./google-analytics";
+import { TempsAnalytics } from "./temps-analytics";
 import AffiliateInit from "./affiliate-init";
 import { ConsentProvider } from "./consent";
 import { CookieBanner } from "@/components/legal/cookie-banner";
@@ -32,9 +33,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         opted in, so neither can be added back without a decision.
       */}
       <ConsentProvider>
-        {children}
-
-        <Toaster position="top-center" richColors />
+        <TempsAnalytics>
+          {children}
+          <Toaster position="top-center" richColors />
+        </TempsAnalytics>
         <GoogleAnalytics />
         <AffiliateInit />
         <Adsense />

@@ -8,10 +8,10 @@
  * it actually does.
  *
  * Opt-in by design. Without `TEST_DATABASE_URL` the whole tier skips, so
- * `pnpm test:run` stays a one-second, zero-dependency command.
+ * `bun run test:run` stays a one-second, zero-dependency command.
  *
  *   createdb sushi_test
- *   TEST_DATABASE_URL=postgresql://localhost:5432/sushi_test pnpm test:db
+ *   TEST_DATABASE_URL=postgresql://localhost:5432/sushi_test bun run test:db
  */
 import { afterAll, beforeAll, beforeEach, describe } from "vitest";
 import { sql } from "drizzle-orm";
@@ -112,7 +112,7 @@ const MANAGED_TABLES = [
  *
  * `vitest.config.mts` already forces this tier through a single fork, which
  * stops two files in the same run from truncating each other. Nothing stopped
- * two *runs*: a second `pnpm test:db`, an editor task, a CI job sharing one
+ * two *runs*: a second `bun run test:db`, an editor task, a CI job sharing one
  * database, or a second agent working in the same checkout. They all point at
  * the same `sushi_test`, and `resetTables` below is a `truncate ... cascade`.
  *
@@ -172,7 +172,7 @@ async function acquireTierLock(): Promise<void> {
       throw new Error(
         `Timed out after ${LOCK_TIMEOUT_MS / 1000}s waiting for the database test lock. ` +
           `Another process is running this tier against the same database — check for a ` +
-          `second "vitest --project db" or "pnpm test:db". They cannot share one database: ` +
+          `second "vitest --project db" or "bun run test:db". They cannot share one database: ` +
           `each truncates the tables the other is mid-test on.`,
         { cause: error },
       );

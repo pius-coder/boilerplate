@@ -13,11 +13,11 @@ database test tier that pins the invariants below.
 
 You need **two databases**: one for the app, one for the tests. They must be
 separate — the test tier runs `TRUNCATE` before every test, so if it shared your
-dev database it would erase your data on every `pnpm test:db`.
+dev database it would erase your data on every `bun run test:db`.
 
 | Database     | Env var             | Purpose                                        |
 | ------------ | ------------------- | ---------------------------------------------- |
-| `sushi_dev`  | `DATABASE_URL`      | What `pnpm dev` reads and writes               |
+| `sushi_dev`  | `DATABASE_URL`      | What `bun run dev` reads and writes               |
 | `sushi_test` | `TEST_DATABASE_URL` | Wiped constantly. Holds nothing you care about |
 
 Both live on the **same** Postgres server — same host, same port, same
@@ -26,15 +26,15 @@ credentials. Only the database name at the end of the URL differs.
 ### If you have no Postgres yet
 
 ```bash
-pnpm install && pnpm setup
+bun install && bun run setup
 ```
 
 That writes `.env` with generated secrets, starts Postgres 16 in Docker, creates
-both databases, and migrates them. Then `pnpm dev`.
+both databases, and migrates them. Then `bun run dev`.
 
 ### If you already have Postgres running
 
-Very common — and `pnpm setup` detects it and stops rather than fighting for port 5432. Create the two databases on the server you already have:
+Very common — and `bun run setup` detects it and stops rather than fighting for port 5432. Create the two databases on the server you already have:
 
 ```bash
 createdb sushi_dev && createdb sushi_test
@@ -56,13 +56,13 @@ TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/sushi_test
 Then apply the schema to each:
 
 ```bash
-pnpm db:migrate && pnpm test:db:setup
+bun run db:migrate && bun run test:db:setup
 ```
 
 ### Confirm it worked
 
 ```bash
-pnpm test:db
+bun run test:db
 ```
 
 23 tests should pass. If they **skip** instead, `TEST_DATABASE_URL` is not being
@@ -413,8 +413,8 @@ is the drift to watch for in review.
 ## Changing the schema
 
 ```bash
-pnpm db:generate    # after editing src/db/schema.ts
-pnpm db:migrate     # apply locally
+bun run db:generate    # after editing src/db/schema.ts
+bun run db:migrate     # apply locally
 ```
 
 Commit the generated `.sql` **and** `meta/_journal.json`. Never edit an applied
@@ -423,18 +423,18 @@ migration file — write a new one.
 ### Checklist for every schema change
 
 - [ ] Edited `src/db/schema.ts`, not SQL by hand
-- [ ] Ran `pnpm db:generate`; reviewed the generated SQL before committing
+- [ ] Ran `bun run db:generate`; reviewed the generated SQL before committing
 - [ ] **Expand/contract safe** — the currently deployed code still works against the new schema ([DEPLOYMENT.md](../DEPLOYMENT.md#expand--contract))
 - [ ] Added a `src/models/<domain>.ts` helper rather than querying from a service or route
 - [ ] Added an index for any column you filter or sort by at scale
 - [ ] If you added a uniqueness guarantee, added a `tests/db/` test that proves it rejects a duplicate
 - [ ] If you renamed a `users` column, updated the field mapping in `src/lib/auth.ts`
-- [ ] Ran `pnpm test:db` against `sushi_test`
+- [ ] Ran `bun run test:db` against `sushi_test`
 
 ### Adding a table — the full path
 
 1. Define it in `src/db/schema.ts` with the conventions above
-2. `pnpm db:generate`
+2. `bun run db:generate`
 3. Add `src/models/<domain>.ts` with typed helpers
 4. Call from `src/services/*`, then from a route
 5. Add a route auth-gate test and, if the table carries an invariant, a `tests/db/` test

@@ -34,11 +34,10 @@ describe("consent", () => {
       expect(parseConsentCookie(encodeURIComponent("[true]"))).toBeNull();
     });
 
-    it("discards a decision from an older consent version", () => {
-      // The visitor agreed to a different set of categories than the one we
-      // would now be acting on, so the old answer cannot carry over.
+    it("discards a version 1 decision after Temps joins analytics", () => {
+      expect(CONSENT_VERSION).toBe(2);
       const stale = encodeURIComponent(
-        JSON.stringify({ v: CONSENT_VERSION - 1, analytics: true, advertising: true })
+        JSON.stringify({ v: 1, analytics: true, advertising: true })
       );
 
       expect(parseConsentCookie(stale)).toBeNull();
@@ -62,10 +61,12 @@ describe("consent", () => {
       expect(parseConsentCookie(coercible)).toBeNull();
     });
 
-    it("round-trips a real decision", () => {
+    it("round-trips a version 2 decision", () => {
       const mixed = { analytics: true, advertising: false };
+      const serialized = serializeConsent(mixed);
 
-      expect(parseConsentCookie(serializeConsent(mixed))).toEqual(mixed);
+      expect(JSON.parse(decodeURIComponent(serialized))).toMatchObject({ v: 2 });
+      expect(parseConsentCookie(serialized)).toEqual(mixed);
       expect(parseConsentCookie(serializeConsent(DENY_ALL))).toEqual({
         analytics: false,
         advertising: false,

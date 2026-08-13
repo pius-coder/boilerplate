@@ -58,26 +58,30 @@ error boundaries, client transport conventions, and file naming.
 Requirements:
 
 - Node.js `>=20.19.0 <23`
-- pnpm `10.22.0`
+- Bun `1.3.14` (exact version from `.bun-version`)
 - Docker for the default local PostgreSQL and Redis services
 
 ```bash
-pnpm install
-pnpm setup
-pnpm dev
+bun install
+bun run setup
+bun run dev
 ```
 
 The application runs on `http://localhost:3000`. Start the admin console in a
 second terminal:
 
 ```bash
-pnpm dev:admin
+bun run dev:admin
 ```
 
 The admin app runs on `http://localhost:3001`.
 
-`pnpm setup` is idempotent: it creates local secrets only when `.env` does not
+`bun run setup` is idempotent: it creates local secrets only when `.env` does not
 exist, starts the development services, and applies migrations.
+
+Bun is the only package manager for this repository. `bun.lock` is the canonical
+lockfile and CI installs it with `bun ci`. Do not use npm, pnpm, Yarn, or
+Corepack here; Corepack does not install or manage Bun.
 
 ## Configuration
 
@@ -101,21 +105,32 @@ The application renders an external documentation link only when
 documentation site; it intentionally has no upstream default. The docs website
 is not a submodule and is not built by this repository.
 
+## Temps (optional)
+
+First-party Temps analytics is disabled by default. Configure
+`TEMPS_API_KEY`, `NEXT_PUBLIC_PROJECT_SLUG`, and `NEXT_PUBLIC_TEMPS_API_URL`
+together; the key remains server-only and should have only `analytics:write`.
+The provider remains production-only and does not mount until the visitor
+explicitly accepts analytics cookies. Build the web
+and admin artifacts separately with `bun run build:web` and `bun run build:admin`; the
+admin artifact contains no browser analytics. See [Deployment](DEPLOYMENT.md#temps-optional)
+for standalone, health, cron, and two-project configuration.
+
 ## Essential commands
 
 | Command                | Purpose                                                          |
 | ---------------------- | ---------------------------------------------------------------- |
-| `pnpm dev`             | Start the SaaS application                                       |
-| `pnpm dev:admin`       | Start the separate admin console                                 |
-| `pnpm lint`            | Lint both applications                                           |
-| `pnpm test:run`        | Run all test tiers; infrastructure tests skip without their URLs |
-| `pnpm test:cov`        | Enforce coverage thresholds                                      |
-| `pnpm test:db`         | Run real PostgreSQL and Redis invariant tests                    |
-| `pnpm build`           | Test, then build the application and admin console               |
-| `pnpm db:generate`     | Generate a Drizzle migration                                     |
-| `pnpm db:migrate`      | Apply local migrations                                           |
-| `pnpm db:check:prod`   | Fail on pending, drifted, or unexpected production migrations    |
-| `pnpm db:migrate:prod` | Apply production migrations under an advisory lock               |
+| `bun run dev`             | Start the SaaS application                                       |
+| `bun run dev:admin`       | Start the separate admin console                                 |
+| `bun run lint`            | Lint both applications                                           |
+| `bun run test:run`        | Run all test tiers; infrastructure tests skip without their URLs |
+| `bun run test:cov`        | Enforce coverage thresholds                                      |
+| `bun run test:db`         | Run real PostgreSQL and Redis invariant tests                    |
+| `bun run build`           | Test, then build the application and admin console               |
+| `bun run db:generate`     | Generate a Drizzle migration                                     |
+| `bun run db:migrate`      | Apply local migrations                                           |
+| `bun run db:check:prod`   | Fail on pending, drifted, or unexpected production migrations    |
+| `bun run db:migrate:prod` | Apply production migrations under an advisory lock               |
 
 ## Engineering documentation
 
@@ -127,6 +142,7 @@ public website:
 - [Organizations and authorization](docs/organizations.md)
 - [Error handling contract](docs/errors.md)
 - [Storage providers](docs/storage-providers.md)
+- [African regional baseline](docs/african-baseline.md)
 - [Release checklist](docs/release-checklist.md)
 - [Deployment](DEPLOYMENT.md)
 - [Test strategy](tests/README.md)

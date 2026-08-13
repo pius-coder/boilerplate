@@ -3,7 +3,7 @@
  *
  * `resetTables` is a `truncate ... cascade`, and the tier is opt-in against a
  * database a developer names themselves. Nothing stops a second process — a
- * stray `pnpm test:db`, an editor task, a CI job sharing one database, another
+ * stray `bun run test:db`, an editor task, a CI job sharing one database, another
  * agent in the same checkout — from pointing at it too. When that happened, the
  * other process truncated `users` between a test's seed and its assertions, and
  * the symptom was "failed to create personal organization" thrown from
