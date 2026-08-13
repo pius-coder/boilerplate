@@ -39,6 +39,9 @@ function setProductionRateLimitEnv() {
   vi.stubEnv("STORAGE_BUCKET", "test-bucket");
   vi.stubEnv("STORAGE_ACCESS_KEY", "test-access-key");
   vi.stubEnv("STORAGE_SECRET_KEY", "test-storage-secret");
+  // Make this test independent from any managed S3 endpoint injected by the
+  // hosting environment that runs the production image build.
+  vi.stubEnv("STORAGE_ENDPOINT", "https://storage.example.test");
   vi.stubEnv("NEXT_PUBLIC_CAPTCHA_ENABLED", "false");
   vi.stubEnv("RATE_LIMIT_IP_SOURCE", "x-forwarded-for");
 }

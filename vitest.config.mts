@@ -39,6 +39,7 @@ export default defineConfig({
   test: {
     environment: "node",
     globals: true,
+    setupFiles: ["tests/setup-env.ts"],
     alias: {
       "@": path.resolve(__dirname, "src"),
       "@/app": path.resolve(__dirname, "src/app"),
@@ -68,7 +69,7 @@ export default defineConfig({
           name: "components",
           environment: "jsdom",
           include: ["tests/components/**/*.test.tsx"],
-          setupFiles: ["tests/components/setup.ts"],
+          setupFiles: ["tests/setup-env.ts", "tests/components/setup.ts"],
         },
       },
       {
