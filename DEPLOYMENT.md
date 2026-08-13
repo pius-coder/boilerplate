@@ -276,6 +276,12 @@ bun run build:web
 bun run build:admin
 ```
 
+The web project uses the root [`Dockerfile`](Dockerfile). Keep its Temps preset
+pointed at the repository root so Temps detects that file instead of generating
+its own Next.js Dockerfile. The image builds only `build:web`, copies the
+standalone server into a minimal Node runtime, and runs it as a non-root user.
+Build-time `NEXT_PUBLIC_*` values must therefore be available to the Docker build.
+
 Configure the web and admin as **two distinct Temps projects**. The web project
 uses the root `.temps.yaml`, whose liveness probe is `/api/health` and whose
 five-minute cron calls `/api/cron/jobs`. Both web and admin expose dependency-free

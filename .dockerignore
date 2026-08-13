@@ -1,0 +1,12 @@
+.git
+.github
+.next
+apps/admin/.next
+node_modules
+coverage
+tmp
+.env*
+.DS_Store
+*.log
+Dockerfile*
+docker-compose*.yml
