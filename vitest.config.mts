@@ -39,7 +39,6 @@ export default defineConfig({
   test: {
     environment: "node",
     globals: true,
-    setupFiles: ["tests/setup-env.ts"],
     alias: {
       "@": path.resolve(__dirname, "src"),
       "@/app": path.resolve(__dirname, "src/app"),
@@ -51,6 +50,7 @@ export default defineConfig({
         extends: true,
         test: {
           name: "mocked",
+          setupFiles: ["tests/setup-env.ts"],
           // `.ts` only, so the component tier's `.tsx` files cannot be pulled
           // into a Node environment where `document` does not exist.
           include: ["tests/**/*.test.ts"],
